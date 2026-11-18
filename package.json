@@ -1,0 +1,13 @@
+{
+	"name": "stickman-story-studio",
+	"version": "1.0.0",
+	"description": "AI 2D Stickman Twist Story Video Studio (Thỏ Kì Quái / Sandiao Style) — Rough Idea -> 6-Act Script -> Multi-Voice TTS -> Parallel 1080p MP4",
+	"type": "module",
+	"scripts": {
+		"start": "node server/index.mjs",
+		"setup": "node scripts/setup.mjs"
+	},
+	"dependencies": {
+		"playwright": "^1.52.0"
+	}
+}

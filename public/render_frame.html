@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>Stickman Worker Stage</title>
+<style>
+  @font-face {
+    font-family: "BeVietnamPro";
+    src: url("/assets/fonts/BeVietnamPro-Bold.ttf") format("truetype");
+    font-weight: 700;
+  }
+  @font-face {
+    font-family: "BeVietnamPro";
+    src: url("/assets/fonts/BeVietnamPro-ExtraBold.ttf") format("truetype");
+    font-weight: 800;
+  }
+  @font-face {
+    font-family: "BeVietnamPro";
+    src: url("/assets/fonts/BeVietnamPro-Black.ttf") format("truetype");
+    font-weight: 900;
+  }
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: #080d14;
+    overflow: hidden;
+  }
+  canvas {
+    display: block;
+  }
+</style>
+</head>
+<body>
+<canvas id="stage" width="1920" height="1080"></canvas>
+<script src="/engine.js"></script>
+<script>
+  window.__initJob = async function (jobId) {
+    const res = await fetch(`/jobs/${encodeURIComponent(jobId)}/beats.json`);
+    const data = await res.json();
+    const c = document.getElementById("stage");
+    c.width = data.width || 1920;
+    c.height = data.height || 1080;
+    window.STORY_DATA = data;
+    await document.fonts.ready;
+    window.renderAt(0.1);
+    return { width: c.width, height: c.height, totalFrames: data.totalFrames, fps: data.fps };
+  };
+</script>
+</body>
+</html>

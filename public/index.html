@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Stickman Story Studio — Tạo Phim Hoạt Hình Lật Kèo 1080p</title>
+  <link rel="stylesheet" href="/studio.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge">2D</div>
+      <div>
+        <h1>STICKMAN STORY STUDIO</h1>
+        <span>Biến vài dòng ý tưởng thô thành phim hoạt hình lật kèo 1080p chuẩn Thỏ Kì Quái</span>
+      </div>
+    </div>
+    <div class="top-actions">
+      <button class="btn" id="btnLoadDemo">Nạp Mẫu Demo Sẵn</button>
+      <button class="btn" id="btnOpenNoKeyModal">Dùng Không Cần API Key (Copy/Dán JSON)</button>
+    </div>
+  </header>
+
+  <main class="workspace">
+    <!-- CỘT TRÁI: NHẬP Ý TƯỞNG + DÀN NHÂN VẬT + CẤU HÌNH AI -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <span class="step-tag">Bước 01 · Biên Kịch Tự Động</span>
+          <h2>Ý Tưởng Sương Sương & Dàn Nhân Vật</h2>
+        </div>
+      </div>
+
+      <label for="roughIdea">Cốt truyện sương sương (chỉ cần 2–5 câu):</label>
+      <textarea id="roughIdea" rows="5" placeholder="Ví dụ: Trọng Tính học Kinh tế UEH có thằng bạn thân là Đào Trọng dân Kỹ thuật. Tính hay qua phòng trọ uống trà sữa học lỏm code rồi định bỏ thuốc nhốt Đào Trọng ở nhà để một mình đi thi ẵm giải 5 tỷ..."></textarea>
+
+      <div class="grid-3">
+        <div>
+          <label for="targetMinutes">Thời lượng đích</label>
+          <select id="targetMinutes">
+            <option value="1">Test nhanh (~1 phút · ~14 cảnh)</option>
+            <option value="3">Vừa đẹp (~3 phút · ~34 cảnh)</option>
+            <option value="5" selected>Tập Full (~5 phút · ~58 cảnh)</option>
+          </select>
+        </div>
+        <div>
+          <label for="aspectRatio">Khung hình</label>
+          <select id="aspectRatio">
+            <option value="16:9" selected>16:9 Ngang (YouTube 1920×1080)</option>
+            <option value="9:16">9:16 Dọc (TikTok/Shorts 1080×1920)</option>
+          </select>
+        </div>
+        <div>
+          <label for="channelName">Tên kênh góc trái</label>
+          <input type="text" id="channelName" value="Hồ Sơ Lật Kèo" />
+        </div>
+      </div>
+
+      <label>Dàn nhân vật (Tự đổi tên, nhãn thẻ ngực, màu áo & chất giọng):</label>
+      <div class="char-card">
+        <div class="char-row">
+          <input type="text" id="charMainName" value="Đào Trọng" title="Tên nhân vật chính" />
+          <input type="text" id="charMainBadge" value="" placeholder="Nhãn áo" />
+          <input type="color" id="charMainColor" value="#2978a0" />
+          <select id="charMainVoice">
+            <option value="male_calm" selected>Nam Trầm Điềm Tĩnh</option>
+            <option value="female_sharp">Nữ Sắc Sảo</option>
+          </select>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-row">
+          <input type="text" id="charRivalName" value="Trọng Tính" title="Tên đối thủ / bạn thân" />
+          <input type="text" id="charRivalBadge" value="UEH" placeholder="Nhãn thẻ" />
+          <input type="color" id="charRivalColor" value="#7b4880" />
+          <select id="charRivalVoice">
+            <option value="male_schemer" selected>Nam Nhanh Láu Cá</option>
+            <option value="female_sharp">Nữ Đanh Đá</option>
+          </select>
+        </div>
+      </div>
+      <div class="char-card">
+        <div class="char-row">
+          <input type="text" id="charBossName" value="Chủ tịch Trần" title="Nhân vật phụ / Sếp / Giám khảo" />
+          <input type="text" id="charBossBadge" value="" placeholder="Nhãn áo" />
+          <input type="color" id="charBossColor" value="#3a4554" />
+          <select id="charBossVoice">
+            <option value="male_boss" selected>Nam Trầm Uy Nghiêm</option>
+            <option value="male_calm">Nam Điềm Đạm</option>
+          </select>
+        </div>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--border); margin: 18px 0;" />
+
+      <span class="step-tag">Kết nối AI Viết Kịch Bản (Lưu trên trình duyệt máy bạn)</span>
+      <div class="grid-2">
+        <div>
+          <label for="aiModel">Model Gemini (AI Studio Free Key)</label>
+          <select id="aiModel">
+            <option value="gemini-4-hydrogen" selected>gemini-4-hydrogen (Khuyên dùng)</option>
+            <option value="gemini-3.5-flash-lite">gemini-3.5-flash-lite (Siêu nhanh)</option>
+            <option value="gemini-4-argon">gemini-4-argon (Lập luận sâu)</option>
+          </select>
+        </div>
+        <div>
+          <label for="apiKey">Gemini API Key (aistudio.google.com/apikey)</label>
+          <input type="password" id="apiKey" placeholder="Dán Gemini API Key (hoặc dùng chế độ 0 cần key)" />
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-amber" id="btnExpandAI" style="flex: 1;">
+          ✨ AI Bung Kịch Bản 6 Hồi Tự Động
+        </button>
+      </div>
+
+      <hr style="border: 0; border-top: 1px solid var(--border); margin: 18px 0;" />
+
+      <span class="step-tag">Bước 03 · Xuất Phim Đa Luồng</span>
+      <div class="grid-2" style="margin-bottom: 12px;">
+        <div>
+          <label for="workersCount">Số luồng CPU Render song song</label>
+          <input type="number" id="workersCount" min="1" max="8" value="4" />
+        </div>
+        <div>
+          <label>Đầu ra chuẩn</label>
+          <input type="text" value="MP4 H.264 + Phụ đề .VTT (-15 LUFS)" disabled />
+        </div>
+      </div>
+
+      <button class="btn btn-emerald" id="btnStartRender">
+        🎬 XUẤT VIDEO MP4 FULL HD NGAY
+      </button>
+
+      <div class="progress-box" id="progressBox">
+        <div style="display:flex; justify-content:space-between; font-size:13px;">
+          <span id="progressMsg">Đang khởi tạo...</span>
+          <strong id="progressPct" style="color:var(--amber);">0%</strong>
+        </div>
+        <div class="bar-track">
+          <div class="bar-fill" id="progressBar"></div>
+        </div>
+      </div>
+
+      <div class="video-result" id="videoResult">
+        <label style="color:var(--emerald); font-size:13px;">✅ Video đã xuất thành công!</label>
+        <video id="outputVideo" controls playsinline></video>
+        <div class="btn-row">
+          <a class="btn btn-cyan" id="downloadMp4" href="#" download="Stickman-Story.mp4" style="text-decoration:none; flex:1;">⬇ Tải Video .MP4</a>
+          <a class="btn" id="downloadVtt" href="#" download="Stickman-Story.vtt" style="text-decoration:none;">⬇ Phụ đề .VTT</a>
+        </div>
+      </div>
+    </section>
+
+    <!-- CỘT PHẢI: MÀN HÌNH XEM TRƯỚC 60FPS & DANH SÁCH PHÂN CẢNH -->
+    <div class="right-col">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <span class="step-tag">Bước 02 · Bàn Dựng & Kiểm Duyệt Khung Hình Trực Tiếp</span>
+            <h2 id="storyTitleHeading">Đang nạp kịch bản mẫu...</h2>
+          </div>
+          <button class="btn" id="btnPlayPreview">▶ Chạy Thử Chuyển Động Cảnh Này</button>
+        </div>
+
+        <div class="monitor-wrap">
+          <div class="canvas-frame" id="canvasContainer">
+            <canvas id="previewCanvas" width="1920" height="1080"></canvas>
+          </div>
+
+          <div class="scene-inspector">
+            <span class="step-tag" id="inspectorLabel">Chỉnh Sửa Nhanh Cảnh #01</span>
+            <label for="scSpeaker">Người nói cảnh này</label>
+            <select id="scSpeaker">
+              <option value="main">Nhân vật chính (main)</option>
+              <option value="rival">Đối thủ / Bạn thân (rival)</option>
+              <option value="boss">Chủ tịch / Giám khảo (boss)</option>
+              <option value="ai">Hệ thống AI báo động (ai)</option>
+            </select>
+
+            <div class="grid-2">
+              <div>
+                <label for="scLayout">Bố cục góc máy</label>
+                <select id="scLayout">
+                  <option value="ui_transfer_stamp">Đóng dấu chuyển giao UI</option>
+                  <option value="ecu_main">Cận mặt Nhân vật chính</option>
+                  <option value="ecu_rival">Cận mặt Đối thủ ($ / Sợ)</option>
+                  <option value="ecu_glow_eyes">Mắt phát sáng trong bóng tối</option>
+                  <option value="over_monitor">Ngồi sau 2 màn hình code</option>
+                  <option value="solo_stage_talk">Đứng nói một mình</option>
+                  <option value="two_shot">Hai người đối thoại</option>
+                  <option value="sneak_phone">Chụp lén bằng điện thoại</option>
+                  <option value="prop_phone_chat">Cận màn hình điện thoại</option>
+                  <option value="prop_terminal_code">Màn hình code / Báo lỗi</option>
+                  <option value="prop_board_table">Bảng kế hoạch / Báo cáo ROI</option>
+                  <option value="prop_magnifying_item">Kính lúp soi ly trà / Chai thuốc</option>
+                  <option value="prop_document_note">Văn bản / Kỷ luật đóng dấu</option>
+                  <option value="prop_breaker_padlock">Cúp cầu dao + Khóa cửa</option>
+                  <option value="fake_collapse">Giả xỉu trên bàn</option>
+                  <option value="stage_pitch">Thuyết trình sân khấu lớn</option>
+                  <option value="red_alarm">Còi báo động đỏ khẩn cấp</option>
+                  <option value="stage_webcam_expose">Chiếu camera 4K bóc phốt</option>
+                  <option value="grand_entrance">Mở cửa bước vào cực ngầu</option>
+                  <option value="karma_sprint">Ôm bụng chạy trối chết</option>
+                </select>
+              </div>
+              <div>
+                <label for="scBg">Bối cảnh nền</label>
+                <select id="scBg">
+                  <option value="dark_lab">Phòng máy / Văn phòng tối</option>
+                  <option value="campus_hall">Sảnh Đại học / Kinh tế</option>
+                  <option value="dorm_room">Phòng trọ / Ký túc xá</option>
+                  <option value="stage_hall">Hội trường sân khấu lớn</option>
+                  <option value="stage_expose">Sân khấu báo động đỏ</option>
+                  <option value="prison_noir">Hành lang tối / Ẩn dụ</option>
+                  <option value="dark_noir">Tối đen điện ảnh</option>
+                </select>
+              </div>
+            </div>
+
+            <label for="scCardTitle">Chữ tiêu đề trên bảng / màn hình đạo cụ (nếu có)</label>
+            <input type="text" id="scCardTitle" placeholder="VD: CẢNH BÁO ĐÁNH CẮP MÃ NGUỒN!" />
+
+            <label for="scText">Lời dẫn chuyện / Thoại tiếng Việt của cảnh này</label>
+            <textarea id="scText" rows="4"></textarea>
+
+            <div class="btn-row">
+              <button class="btn" id="btnAddScene">+ Thêm Cảnh Dưới</button>
+              <button class="btn" id="btnDeleteScene" style="color:#ff8787;">Xóa Cảnh</button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <span class="step-tag">Danh Sách Phân Cảnh (<span id="sceneCountBadge">0</span> cảnh)</span>
+            <h2>Bấm vào từng dòng để xem khung hình trực tiếp</h2>
+          </div>
+        </div>
+        <div class="scenes-list" id="scenesList"></div>
+      </section>
+    </div>
+  </main>
+
+  <!-- MODAL DÙNG KHÔNG CẦN API KEY -->
+  <div class="modal-backdrop" id="noKeyModal">
+    <div class="modal-card">
+      <div class="panel-head">
+        <div>
+          <span class="step-tag">Chế Độ Miễn Phí 100% · Không Cần API Key</span>
+          <h2>Copy Prompt sang Gemini / ChatGPT Web rồi dán JSON về đây</h2>
+        </div>
+        <button class="btn" id="btnCloseModal">Đóng</button>
+      </div>
+      <p style="font-size:13px; color:var(--ink-dim); margin-top:0;">
+        1. Bấm <strong>Copy Prompt Mẫu</strong> bên dưới rồi dán vào trang web Gemini hoặc ChatGPT miễn phí.<br/>
+        2. Copy đoạn JSON kết quả dán vào ô bên dưới rồi bấm <strong>Nạp Vào Bàn Dựng</strong>!
+      </p>
+      <div class="btn-row" style="margin-bottom:12px;">
+        <button class="btn btn-amber" id="btnCopyPrompt">📋 Copy Prompt Mẫu Theo Ý Tưởng Của Bạn</button>
+      </div>
+      <label for="pasteJsonArea">Dán kết quả JSON từ Gemini / ChatGPT vào đây:</label>
+      <textarea id="pasteJsonArea" rows="9" placeholder='{"title": "...", "scenes": [ ... ]}'></textarea>
+      <div class="btn-row">
+        <button class="btn btn-cyan" id="btnImportJson" style="flex:1;">✔ Nạp JSON Vào Bàn Dựng</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="/engine.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>
