@@ -42,6 +42,9 @@
     c.height = data.height || 1080;
     window.STORY_DATA = data;
     await document.fonts.ready;
+    if (window.StickmanEngine && window.StickmanEngine.preloadImages) {
+      await window.StickmanEngine.preloadImages(data);
+    }
     window.renderAt(0.1);
     return { width: c.width, height: c.height, totalFrames: data.totalFrames, fps: data.fps };
   };

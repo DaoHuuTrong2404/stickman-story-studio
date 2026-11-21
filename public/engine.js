@@ -50,6 +50,115 @@
 	}
 
 	const bgCache = {};
+	const imageCache = {};
+
+	function getCachedImage(url) {
+		if (!url) return null;
+		const entry = imageCache[url];
+		if (entry && entry.loaded && entry.img && entry.img.naturalWidth > 0) {
+			return entry.img;
+		}
+		if (!entry) {
+			const img = new Image();
+			const rec = { img, loaded: false, error: false };
+			img.onload = () => {
+				rec.loaded = true;
+			};
+			img.onerror = () => {
+				rec.error = true;
+			};
+			img.src = url;
+			imageCache[url] = rec;
+		}
+		return null;
+	}
+
+	async function preloadImages(data, onLoaded) {
+		const urls = new Set();
+		const scenes = (data && Array.isArray(data.scenes) && data.scenes) || [];
+		for (const sc of scenes) {
+			if (sc.bgImageUrl) urls.add(sc.bgImageUrl);
+			if (sc.cutoutImageUrl) urls.add(sc.cutoutImageUrl);
+			if (sc.sceneImageUrl) urls.add(sc.sceneImageUrl);
+			if (sc.avatarImageUrl) urls.add(sc.avatarImageUrl);
+		}
+		if (urls.size === 0) return;
+		await Promise.race([
+			Promise.all(
+				Array.from(urls).map(
+					(url) =>
+						new Promise((resolve) => {
+							const existing = imageCache[url];
+							if (existing && (existing.loaded || existing.error)) {
+								resolve();
+								return;
+							}
+							const img = (existing && existing.img) || new Image();
+							const rec = existing || { img, loaded: false, error: false };
+							imageCache[url] = rec;
+							img.onload = () => {
+								rec.loaded = true;
+								if (onLoaded) onLoaded();
+								resolve();
+							};
+							img.onerror = () => {
+								rec.error = true;
+								resolve();
+							};
+							if (!img.src) img.src = url;
+						}),
+				),
+			),
+			new Promise((resolve) => setTimeout(resolve, 4500)),
+		]);
+	}
+
+	const letterboxCache = {};
+	function getLetterboxBarCanvas(W, H) {
+		const key = `${W}x${H}`;
+		if (letterboxCache[key]) return letterboxCache[key];
+		const off = document.createElement("canvas");
+		off.width = W;
+		off.height = H;
+		const c = off.getContext("2d");
+		const g = c.createLinearGradient(0, 0, W, H);
+		g.addColorStop(0, "#0e1a2c");
+		g.addColorStop(0.5, "#11223a");
+		g.addColorStop(1, "#0b1525");
+		c.fillStyle = g;
+		c.fillRect(0, 0, W, H);
+
+		// Subtle stamped dark paw prints along the bar
+		c.fillStyle = "rgba(4, 9, 17, 0.56)";
+		const count = Math.max(10, Math.round(W / 120));
+		for (let i = 0; i < count; i++) {
+			const px = ((i + 0.45) / count) * W + (hash01(i * 3.1) - 0.5) * 40;
+			const py = H * (0.28 + hash01(i * 7.3) * 0.44);
+			const ang = (hash01(i * 11.7) - 0.5) * 1.1;
+			const sc = (0.72 + hash01(i * 5.9) * 0.45) * (H / 76);
+			c.save();
+			c.translate(px, py);
+			c.rotate(ang);
+			c.scale(sc, sc);
+			c.beginPath();
+			c.ellipse(0, 6, 12, 10, 0, 0, Math.PI * 2);
+			c.fill();
+			const toes = [
+				[-12, -8, -0.3],
+				[-4, -13, -0.1],
+				[5, -13, 0.1],
+				[13, -8, 0.3],
+			];
+			for (const [tx, ty, rot] of toes) {
+				c.beginPath();
+				c.ellipse(tx, ty, 4, 6, rot, 0, Math.PI * 2);
+				c.fill();
+			}
+			c.restore();
+		}
+		letterboxCache[key] = off;
+		return off;
+	}
 
 	function getBgCanvas(name, W, H) {
 		const key = `${name}_${W}x${H}`;
@@ -224,6 +333,154 @@
 			c.fillStyle = isAlarm ? "#1c0d12" : "#142030";
 			c.fillRect(0, H * 0.72, W, H * 0.28);
 			addVignette(0.56);
+		} else if (name === "zoo_enclosure") {
+			const sky = c.createLinearGradient(0, 0, 0, H * 0.72);
+			sky.addColorStop(0, "#1d242e");
+			sky.addColorStop(0.55, "#2b333f");
+			sky.addColorStop(1, "#141a22");
+			c.fillStyle = sky;
+			c.fillRect(0, 0, W, H);
+
+			// Misty storm clouds
+			for (let i = 0; i < 12; i++) {
+				const cx = hash01(i * 13.7) * W;
+				const cy = hash01(i * 5.3) * H * 0.34;
+				const cr = 180 + hash01(i * 9.1) * 180;
+				const cg = c.createRadialGradient(cx, cy, 10, cx, cy, cr);
+				cg.addColorStop(0, "rgba(115, 132, 152, 0.16)");
+				cg.addColorStop(1, "rgba(25, 32, 42, 0)");
+				c.fillStyle = cg;
+				c.fillRect(0, 0, W, H * 0.55);
+			}
+
+			// Dense night foliage treeline
+			c.fillStyle = "#0e151a";
+			for (let x = -40; x < W + 80; x += 95) {
+				const h = 210 + hash01(x * 0.13) * 260;
+				c.beginPath();
+				c.arc(x, H * 0.54 - h * 0.45, h * 0.48, 0, Math.PI * 2);
+				c.fill();
+			}
+
+			// Jagged dark zoo rockery mound center
+			c.fillStyle = "#262f3a";
+			c.beginPath();
+			c.moveTo(W * 0.25, H * 0.64);
+			c.lineTo(W * 0.37, H * 0.38);
+			c.lineTo(W * 0.47, H * 0.34);
+			c.lineTo(W * 0.58, H * 0.31);
+			c.lineTo(W * 0.69, H * 0.43);
+			c.lineTo(W * 0.81, H * 0.64);
+			c.closePath();
+			c.fill();
+			c.strokeStyle = "#0b0f14";
+			c.lineWidth = 4;
+			c.stroke();
+
+			// Rock facets
+			c.fillStyle = "#394452";
+			c.beginPath();
+			c.moveTo(W * 0.37, H * 0.38);
+			c.lineTo(W * 0.47, H * 0.34);
+			c.lineTo(W * 0.52, H * 0.56);
+			c.lineTo(W * 0.41, H * 0.59);
+			c.closePath();
+			c.fill();
+
+			// Midground steel rail fence
+			c.strokeStyle = "#0a0e13";
+			c.lineWidth = 6;
+			c.strokeRect(0, H * 0.56, W, H * 0.08);
+			for (let x = 24; x < W; x += 36) {
+				c.beginPath();
+				c.moveTo(x, H * 0.56);
+				c.lineTo(x, H * 0.64);
+				c.stroke();
+			}
+
+			// Flagstone pavement
+			const pave = c.createLinearGradient(0, H * 0.64, 0, H);
+			pave.addColorStop(0, "#242c35");
+			pave.addColorStop(1, "#12171d");
+			c.fillStyle = pave;
+			c.fillRect(0, H * 0.64, W, H * 0.36);
+
+			c.strokeStyle = "rgba(9, 13, 18, 0.65)";
+			c.lineWidth = 3;
+			for (let row = 0; row < 5; row++) {
+				const y = H * 0.66 + row * 72;
+				c.beginPath();
+				c.moveTo(0, y);
+				c.lineTo(W, y);
+				c.stroke();
+				for (let col = 0; col < 10; col++) {
+					const x = col * 220 + (row % 2) * 110;
+					c.beginPath();
+					c.moveTo(x, y);
+					c.lineTo(x - 38, y + 72);
+					c.stroke();
+				}
+			}
+			addVignette(0.55);
+		} else if (name === "haunted_corridor") {
+			const g = c.createLinearGradient(0, 0, 0, H);
+			g.addColorStop(0, "#0b111a");
+			g.addColorStop(0.5, "#15202e");
+			g.addColorStop(1, "#070b10");
+			c.fillStyle = g;
+			c.fillRect(0, 0, W, H);
+
+			// Perspective corridor walls & ceiling
+			c.strokeStyle = "#06090e";
+			c.lineWidth = 6;
+			c.fillStyle = "#192433";
+			c.beginPath();
+			c.moveTo(0, 0);
+			c.lineTo(W * 0.34, H * 0.24);
+			c.lineTo(W * 0.34, H * 0.72);
+			c.lineTo(0, H);
+			c.closePath();
+			c.fill();
+			c.stroke();
+
+			c.beginPath();
+			c.moveTo(W, 0);
+			c.lineTo(W * 0.66, H * 0.24);
+			c.lineTo(W * 0.66, H * 0.72);
+			c.lineTo(W, H);
+			c.closePath();
+			c.fill();
+			c.stroke();
+
+			// Flickering overhead cold light panel
+			const lg = c.createRadialGradient(
+				W * 0.5,
+				H * 0.26,
+				15,
+				W * 0.5,
+				H * 0.36,
+				520,
+			);
+			lg.addColorStop(0, "rgba(155, 224, 255, 0.34)");
+			lg.addColorStop(0.45, "rgba(82, 145, 195, 0.12)");
+			lg.addColorStop(1, "rgba(10, 16, 24, 0)");
+			c.fillStyle = lg;
+			c.fillRect(0, 0, W, H);
+
+			c.fillStyle = "#b5e8ff";
+			c.fillRect(W * 0.43, H * 0.14, W * 0.14, 18);
+
+			// Dark barred exit door at vanishing point
+			c.fillStyle = "#0b1017";
+			c.fillRect(W * 0.4, H * 0.26, W * 0.2, H * 0.44);
+			c.strokeStyle = "#263344";
+			c.lineWidth = 5;
+			c.strokeRect(W * 0.4, H * 0.26, W * 0.2, H * 0.44);
+
+			// Red emergency EXIT glow
+			c.fillStyle = "#d92638";
+			c.fillRect(W * 0.46, H * 0.21, W * 0.08, 28);
+			addVignette(0.68);
 		} else {
 			const g = c.createRadialGradient(
 				W * 0.5,
@@ -456,6 +713,13 @@
 			sg.addColorStop(1, "rgba(74, 198, 118, 0)");
 			ctx.fillStyle = sg;
 			ctx.fill();
+		} else if (emotion === "dread") {
+			const dg = ctx.createLinearGradient(0, -ry * 0.95, 0, ry * 0.35);
+			dg.addColorStop(0, "rgba(16, 26, 44, 0.62)");
+			dg.addColorStop(0.55, "rgba(26, 38, 58, 0.24)");
+			dg.addColorStop(1, "rgba(26, 38, 58, 0)");
+			ctx.fillStyle = dg;
+			ctx.fill();
 		} else if (["villain", "cold", "greed"].includes(emotion)) {
 			const dg = ctx.createLinearGradient(0, -ry, 0, ry * 0.2);
 			dg.addColorStop(0, "rgba(18, 28, 42, 0.42)");
@@ -556,11 +820,22 @@
 			ctx.stroke();
 		};
 		if (
-			["smirk", "cold", "angry", "villain", "greed", "glow_eyes"].includes(
-				emotion,
-			)
+			[
+				"smirk",
+				"cold",
+				"angry",
+				"villain",
+				"greed",
+				"glow_eyes",
+				"dread",
+			].includes(emotion)
 		) {
-			drawBrows(10, -7, 10, -7);
+			drawBrows(
+				emotion === "dread" ? 12 : 10,
+				emotion === "dread" ? -9 : -7,
+				10,
+				-7,
+			);
 		} else if (["panic", "stomach_doom"].includes(emotion)) {
 			drawBrows(-10, 9, -10, 9);
 		} else if (emotion === "smug") {
@@ -701,6 +976,21 @@
 			ctx.quadraticCurveTo(rx * 0.4, -ry * 0.58, 0, -ry * 0.52);
 			ctx.quadraticCurveTo(-rx * 0.4, -ry * 0.58, -rx * 1.02, -ry * 0.3);
 			ctx.closePath();
+		} else if (hairStyle === "sparse_bald") {
+			ctx.strokeStyle = "#080b0f";
+			ctx.lineWidth = 6.5 * scale;
+			ctx.lineCap = "round";
+			for (const sx of [-rx * 0.24, 0, rx * 0.24]) {
+				ctx.beginPath();
+				ctx.moveTo(sx, -ry * 0.92);
+				ctx.quadraticCurveTo(
+					sx + 10 * scale * facing,
+					-ry * 1.24,
+					sx + 24 * scale * facing,
+					-ry * 1.08,
+				);
+				ctx.stroke();
+			}
 		} else {
 			ctx.beginPath();
 			ctx.moveTo(-rx * 1.06, -ry * 0.34);
@@ -734,19 +1024,21 @@
 			ctx.quadraticCurveTo(-rx * 0.88, -ry * 0.24, -rx * 1.06, -ry * 0.34);
 			ctx.closePath();
 		}
-		ctx.fillStyle = hairColor;
-		ctx.fill();
-		if (rimCyan) {
-			ctx.save();
-			ctx.clip();
-			ctx.strokeStyle = "#5bc0ff";
-			ctx.lineWidth = lw * 1.15;
+		if (hairStyle !== "sparse_bald") {
+			ctx.fillStyle = hairColor;
+			ctx.fill();
+			if (rimCyan) {
+				ctx.save();
+				ctx.clip();
+				ctx.strokeStyle = "#5bc0ff";
+				ctx.lineWidth = lw * 1.15;
+				ctx.stroke();
+				ctx.restore();
+			}
+			ctx.strokeStyle = "#080b0f";
+			ctx.lineWidth = lw;
 			ctx.stroke();
-			ctx.restore();
 		}
-		ctx.strokeStyle = "#080b0f";
-		ctx.lineWidth = lw;
-		ctx.stroke();
 		ctx.restore();
 
 		// Noodle arms
@@ -850,6 +1142,55 @@
 				ctx.lineWidth = 4 * scale;
 				ctx.strokeStyle = "#48dcff";
 				ctx.stroke();
+			} else if (pose === "hold_phone") {
+				const px = 86 * scale * facing;
+				const py = shY + 52 * scale;
+				drawArm(
+					-56 * scale * facing,
+					shY + 12 * scale,
+					-66 * scale * facing,
+					shY + 105 * scale,
+					-58 * scale * facing,
+					shY + 175 * scale,
+				);
+				drawArm(
+					52 * scale * facing,
+					shY + 14 * scale,
+					74 * scale * facing,
+					shY + 95 * scale,
+					px - 8 * scale * facing,
+					py + 22 * scale,
+				);
+				ctx.save();
+				ctx.translate(px, py);
+				ctx.rotate(facing * -0.26);
+				roundRectPath(
+					ctx,
+					-28 * scale,
+					-44 * scale,
+					56 * scale,
+					88 * scale,
+					9 * scale,
+				);
+				ctx.fillStyle = "#1c232d";
+				ctx.fill();
+				ctx.lineWidth = 4 * scale;
+				ctx.strokeStyle = "#080b0f";
+				ctx.stroke();
+				// Dual rear camera lenses
+				for (const [lx, ly] of [
+					[-12 * scale, -28 * scale],
+					[-12 * scale, -14 * scale],
+				]) {
+					ctx.beginPath();
+					ctx.arc(lx, ly, 5.2 * scale, 0, Math.PI * 2);
+					ctx.fillStyle = "#080b0f";
+					ctx.fill();
+					ctx.lineWidth = 1.6 * scale;
+					ctx.strokeStyle = "#6c7a89";
+					ctx.stroke();
+				}
+				ctx.restore();
 			} else if (pose === "stomach_clutch") {
 				drawArm(
 					-58 * scale,
@@ -886,7 +1227,492 @@
 				);
 			}
 		}
+		if (emotion === "dread" || emotion === "panic") {
+			const vib = Math.sin(t * 28.0) * 2.5 * scale;
+			ctx.strokeStyle = "rgba(255,255,255,0.65)";
+			ctx.lineWidth = 3.2 * scale;
+			ctx.lineCap = "round";
+			for (const side of [-1, 1]) {
+				for (const ring of [0, 1]) {
+					const ox = side * (rx + (20 + ring * 13) * scale) + vib * 0.4;
+					ctx.beginPath();
+					ctx.arc(
+						ox,
+						-ry * 0.25,
+						22 * scale,
+						side < 0 ? Math.PI * 0.68 : -Math.PI * 0.32,
+						side < 0 ? Math.PI * 1.32 : Math.PI * 0.32,
+					);
+					ctx.stroke();
+				}
+			}
+		}
 		ctx.restore();
+	}
+
+	function drawAvatarPortrait(c, kind, size, customImg, opts = {}) {
+		const isCutout = Boolean(opts && opts.cutoutMode);
+		c.save();
+		if (isCutout) {
+			c.beginPath();
+			c.arc(size * 0.5, size * 0.5, size * 0.49, 0, Math.PI * 2);
+			c.save();
+			c.clip();
+		} else {
+			roundRectPath(c, 0, 0, size, size, size * 0.16);
+			c.fillStyle = "#d9e1ea";
+			c.fill();
+			c.save();
+			c.clip();
+		}
+
+		if (customImg) {
+			const iw = customImg.naturalWidth || size;
+			const ih = customImg.naturalHeight || size;
+			const sc = Math.max(size / iw, size / ih);
+			c.drawImage(
+				customImg,
+				(size - iw * sc) / 2,
+				(size - ih * sc) / 2,
+				iw * sc,
+				ih * sc,
+			);
+			c.restore();
+			if (!isCutout) {
+				c.lineWidth = Math.max(4, size * 0.04);
+				c.strokeStyle = "#0b1016";
+				roundRectPath(c, 0, 0, size, size, size * 0.16);
+				c.stroke();
+			}
+			c.restore();
+			return;
+		}
+
+		if (isCutout) {
+			const cg = c.createRadialGradient(
+				size * 0.5,
+				size * 0.5,
+				size * 0.05,
+				size * 0.5,
+				size * 0.5,
+				size * 0.5,
+			);
+			cg.addColorStop(0, "rgba(28, 36, 48, 0.95)");
+			cg.addColorStop(0.75, "rgba(15, 21, 29, 0.85)");
+			cg.addColorStop(1, "rgba(10, 14, 20, 0)");
+			c.fillStyle = cg;
+		} else {
+			const bg = c.createLinearGradient(0, 0, 0, size);
+			bg.addColorStop(0, "#cfd8e3");
+			bg.addColorStop(1, "#7c8896");
+			c.fillStyle = bg;
+		}
+		c.fillRect(0, 0, size, size);
+
+		const s = size / 180;
+		const cx = size * 0.5;
+		const cy = size * 0.56;
+		c.lineJoin = "round";
+		c.lineCap = "round";
+
+		if (kind === "tiger") {
+			// Ears
+			for (const sd of [-1, 1]) {
+				c.fillStyle = "#c97428";
+				c.strokeStyle = "#0a0d12";
+				c.lineWidth = 4.5 * s;
+				c.beginPath();
+				c.arc(cx + sd * 48 * s, cy - 42 * s, 20 * s, 0, Math.PI * 2);
+				c.fill();
+				c.stroke();
+			}
+			// Broad feline head
+			c.fillStyle = "#d9822b";
+			c.beginPath();
+			c.ellipse(cx, cy + 4 * s, 58 * s, 54 * s, 0, 0, Math.PI * 2);
+			c.fill();
+			c.stroke();
+			// Pale cheek muffs
+			c.fillStyle = "#edeae4";
+			for (const sd of [-1, 1]) {
+				c.beginPath();
+				c.ellipse(
+					cx + sd * 28 * s,
+					cy + 20 * s,
+					26 * s,
+					22 * s,
+					sd * 0.2,
+					0,
+					Math.PI * 2,
+				);
+				c.fill();
+			}
+			// Tiger stripes
+			c.strokeStyle = "#14100d";
+			c.lineWidth = 5 * s;
+			for (const yOff of [-36, -24, -12]) {
+				c.beginPath();
+				c.moveTo(cx - 24 * s, cy + yOff * s);
+				c.lineTo(cx, cy + (yOff + 6) * s);
+				c.lineTo(cx + 24 * s, cy + yOff * s);
+				c.stroke();
+			}
+			// Glowing pinhole eyes
+			for (const sd of [-1, 1]) {
+				c.fillStyle = "#090b0e";
+				c.beginPath();
+				c.ellipse(
+					cx + sd * 21 * s,
+					cy - 6 * s,
+					11 * s,
+					6 * s,
+					sd * -0.25,
+					0,
+					Math.PI * 2,
+				);
+				c.fill();
+				c.fillStyle = "#ffffff";
+				c.beginPath();
+				c.arc(cx + sd * 20 * s, cy - 6 * s, 3.2 * s, 0, Math.PI * 2);
+				c.fill();
+			}
+			// Snarl nose & fangs
+			c.fillStyle = "#7a2c38";
+			c.beginPath();
+			c.moveTo(cx - 10 * s, cy + 12 * s);
+			c.lineTo(cx + 10 * s, cy + 12 * s);
+			c.lineTo(cx, cy + 23 * s);
+			c.closePath();
+			c.fill();
+			c.fillStyle = "#180d0e";
+			c.beginPath();
+			c.ellipse(cx, cy + 36 * s, 19 * s, 12 * s, 0, 0, Math.PI * 2);
+			c.fill();
+		} else if (kind === "gorilla") {
+			c.fillStyle = "#26282e";
+			c.strokeStyle = "#090b0e";
+			c.lineWidth = 4.5 * s;
+			c.beginPath();
+			c.arc(cx, cy - 10 * s, 54 * s, 0, Math.PI * 2);
+			c.fill();
+			c.stroke();
+			c.beginPath();
+			c.ellipse(cx, cy + 34 * s, 66 * s, 38 * s, 0, Math.PI, 0);
+			c.fill();
+			c.stroke();
+			c.fillStyle = "#564a46";
+			c.beginPath();
+			c.ellipse(cx, cy + 8 * s, 38 * s, 30 * s, 0, 0, Math.PI * 2);
+			c.fill();
+			for (const sd of [-1, 1]) {
+				c.fillStyle = "#0a0c0f";
+				c.beginPath();
+				c.arc(cx + sd * 15 * s, cy - 6 * s, 9 * s, 0, Math.PI * 2);
+				c.fill();
+				c.fillStyle = "#ffffff";
+				c.beginPath();
+				c.arc(cx + sd * 14 * s, cy - 6 * s, 3.3 * s, 0, Math.PI * 2);
+				c.fill();
+			}
+			// Roaring teeth
+			c.fillStyle = "#12090b";
+			roundRectPath(c, cx - 22 * s, cy + 18 * s, 44 * s, 18 * s, 6 * s);
+			c.fill();
+			c.fillStyle = "#f4f4f6";
+			c.fillRect(cx - 18 * s, cy + 20 * s, 36 * s, 6 * s);
+		} else if (kind === "parrot") {
+			c.fillStyle = "#3c4b59";
+			c.strokeStyle = "#090b0f";
+			c.lineWidth = 4.5 * s;
+			c.beginPath();
+			c.ellipse(cx - 6 * s, cy + 18 * s, 58 * s, 66 * s, 0.15, 0, Math.PI * 2);
+			c.fill();
+			c.stroke();
+			// Wing highlight & yellow crown
+			c.fillStyle = "#6c7f67";
+			c.beginPath();
+			c.ellipse(cx - 20 * s, cy + 38 * s, 34 * s, 44 * s, 0.2, 0, Math.PI * 2);
+			c.fill();
+			// Sharp hooked black beak
+			c.fillStyle = "#181d22";
+			c.beginPath();
+			c.moveTo(cx + 22 * s, cy - 22 * s);
+			c.quadraticCurveTo(cx + 76 * s, cy - 10 * s, cx + 52 * s, cy + 36 * s);
+			c.quadraticCurveTo(cx + 30 * s, cy + 10 * s, cx + 16 * s, cy + 14 * s);
+			c.closePath();
+			c.fill();
+			c.stroke();
+			// Pale face patch + sinister glowing eye
+			c.fillStyle = "#dce2e8";
+			c.beginPath();
+			c.ellipse(cx + 8 * s, cy - 12 * s, 18 * s, 14 * s, 0, 0, Math.PI * 2);
+			c.fill();
+			c.fillStyle = "#0a0c0f";
+			c.beginPath();
+			c.arc(cx + 12 * s, cy - 12 * s, 6 * s, 0, Math.PI * 2);
+			c.fill();
+			c.fillStyle = "#ffffff";
+			c.beginPath();
+			c.arc(cx + 12 * s, cy - 12 * s, 2.5 * s, 0, Math.PI * 2);
+			c.fill();
+		} else if (kind === "skull") {
+			c.fillStyle = "#d8dde4";
+			c.strokeStyle = "#080b0f";
+			c.lineWidth = 5 * s;
+			c.beginPath();
+			c.arc(cx, cy - 12 * s, 50 * s, 0, Math.PI * 2);
+			c.fill();
+			c.stroke();
+			c.fillRect(cx - 28 * s, cy + 20 * s, 56 * s, 32 * s);
+			c.strokeRect(cx - 28 * s, cy + 20 * s, 56 * s, 32 * s);
+			for (const sd of [-1, 1]) {
+				c.fillStyle = "#080b0f";
+				c.beginPath();
+				c.arc(cx + sd * 20 * s, cy - 8 * s, 14 * s, 0, Math.PI * 2);
+				c.fill();
+				c.fillStyle = "#ff4252";
+				c.beginPath();
+				c.arc(cx + sd * 20 * s, cy - 8 * s, 4 * s, 0, Math.PI * 2);
+				c.fill();
+			}
+			for (let t = -16; t <= 16; t += 11) {
+				c.fillStyle = "#080b0f";
+				c.fillRect(cx + t * s, cy + 26 * s, 3 * s, 20 * s);
+			}
+		} else if (kind === "hacker" || kind === "boss") {
+			c.fillStyle = kind === "boss" ? "#1e293b" : "#111820";
+			c.strokeStyle = "#070a0f";
+			c.lineWidth = 5 * s;
+			c.beginPath();
+			c.ellipse(cx, cy + 56 * s, 66 * s, 42 * s, 0, Math.PI, 0);
+			c.fill();
+			c.stroke();
+			c.fillStyle = "#eef3f9";
+			c.beginPath();
+			c.arc(cx, cy - 8 * s, 42 * s, 0, Math.PI * 2);
+			c.fill();
+			c.stroke();
+			// Dark hoodie shadow or boss sunglasses
+			if (kind === "hacker") {
+				c.fillStyle = "#0c131d";
+				c.beginPath();
+				c.arc(cx, cy - 12 * s, 48 * s, Math.PI * 0.9, Math.PI * 2.1);
+				c.fill();
+			}
+			for (const sd of [-1, 1]) {
+				c.fillStyle = "#090d14";
+				roundRectPath(
+					c,
+					cx + sd * 18 * s - 12 * s,
+					cy - 16 * s,
+					24 * s,
+					13 * s,
+					4 * s,
+				);
+				c.fill();
+				c.fillStyle = "#48dcff";
+				c.beginPath();
+				c.arc(cx + sd * 18 * s, cy - 10 * s, 3 * s, 0, Math.PI * 2);
+				c.fill();
+			}
+		} else {
+			// Elephant default
+			c.fillStyle = "#5f5a55";
+			c.strokeStyle = "#090b0f";
+			c.lineWidth = 4.5 * s;
+			// Flared ears
+			for (const sd of [-1, 1]) {
+				c.beginPath();
+				c.ellipse(
+					cx + sd * 46 * s,
+					cy - 8 * s,
+					32 * s,
+					44 * s,
+					sd * 0.12,
+					0,
+					Math.PI * 2,
+				);
+				c.fill();
+				c.stroke();
+			}
+			// Dome head + long wrinkled trunk
+			c.fillStyle = "#797169";
+			c.beginPath();
+			c.arc(cx, cy - 12 * s, 44 * s, 0, Math.PI * 2);
+			c.fill();
+			c.stroke();
+			c.beginPath();
+			c.moveTo(cx - 16 * s, cy + 4 * s);
+			c.quadraticCurveTo(cx - 8 * s, cy + 56 * s, cx + 18 * s, cy + 68 * s);
+			c.lineTo(cx + 28 * s, cy + 56 * s);
+			c.quadraticCurveTo(cx + 12 * s, cy + 36 * s, cx + 16 * s, cy + 4 * s);
+			c.closePath();
+			c.fill();
+			c.stroke();
+			// Ivory tusks
+			c.fillStyle = "#f1efe9";
+			for (const sd of [-1, 1]) {
+				c.beginPath();
+				c.moveTo(cx + sd * 20 * s, cy + 18 * s);
+				c.quadraticCurveTo(
+					cx + sd * 32 * s,
+					cy + 46 * s,
+					cx + sd * 46 * s,
+					cy + 52 * s,
+				);
+				c.quadraticCurveTo(
+					cx + sd * 26 * s,
+					cy + 34 * s,
+					cx + sd * 14 * s,
+					cy + 20 * s,
+				);
+				c.closePath();
+				c.fill();
+				c.stroke();
+			}
+			// Sinister tiny glowing eyes
+			for (const sd of [-1, 1]) {
+				c.fillStyle = "#080b0f";
+				c.beginPath();
+				c.ellipse(
+					cx + sd * 20 * s,
+					cy - 12 * s,
+					7 * s,
+					5 * s,
+					sd * -0.2,
+					0,
+					Math.PI * 2,
+				);
+				c.fill();
+				c.fillStyle = "#ffffff";
+				c.beginPath();
+				c.arc(cx + sd * 20 * s, cy - 12 * s, 2.3 * s, 0, Math.PI * 2);
+				c.fill();
+			}
+		}
+
+		c.restore();
+		if (!isCutout) {
+			c.lineWidth = Math.max(4, size * 0.036);
+			c.strokeStyle = "#090d14";
+			roundRectPath(c, 0, 0, size, size, size * 0.16);
+			c.stroke();
+		}
+		c.restore();
+	}
+
+	function drawCreatureCutout(c, kind, x, y, scale, t, customImg) {
+		c.save();
+		const sway = Math.sin(t * 1.9) * 6;
+		c.translate(x, y + sway);
+		if (customImg) {
+			const h = 540 * scale;
+			const w =
+				h *
+				((customImg.naturalWidth || 1) /
+					Math.max(1, customImg.naturalHeight || 1));
+			c.shadowColor = "rgba(0,0,0,0.75)";
+			c.shadowBlur = 24;
+			c.drawImage(customImg, -w / 2, -h / 2, w, h);
+			c.restore();
+			return;
+		}
+		// Dark looming beast torso behind cutout bust
+		const bodyW = 290 * scale;
+		const bodyH = 290 * scale;
+		c.save();
+		c.fillStyle = "#0f151d";
+		c.beginPath();
+		c.ellipse(0, 120 * scale, bodyW * 0.72, bodyH * 0.65, 0, 0, Math.PI * 2);
+		c.fill();
+		c.lineWidth = 6 * scale;
+		c.strokeStyle = "#06090d";
+		c.stroke();
+		c.translate(-bodyW / 2, -bodyH / 2 - 30 * scale);
+		drawAvatarPortrait(c, kind || "tiger", bodyW, null, { cutoutMode: true });
+		c.restore();
+		c.restore();
+	}
+
+	function drawForegroundBarrier(c, type, W, H) {
+		if (!type || type === "none") return;
+		c.save();
+		if (type === "iron_cage") {
+			c.fillStyle = "#10161e";
+			c.strokeStyle = "#05070a";
+			c.lineWidth = 5;
+			for (let x = 110; x < W - 40; x += 155) {
+				c.fillRect(x, H * 0.44, 18, H * 0.6);
+				c.strokeRect(x, H * 0.44, 18, H * 0.6);
+			}
+			for (const ry of [H * 0.56, H * 0.78]) {
+				c.fillStyle = "#18212d";
+				c.fillRect(0, ry, W, 24);
+				c.strokeRect(0, ry, W, 24);
+			}
+		} else {
+			// Weathered wooden zoo fence across foreground lower third
+			const posts = [170, 810, 1460];
+			const gBeam = c.createLinearGradient(0, H * 0.62, 0, H * 0.94);
+			gBeam.addColorStop(0, "#4f4139");
+			gBeam.addColorStop(1, "#271f1b");
+			for (const ry of [H * 0.65, H * 0.81]) {
+				c.fillStyle = gBeam;
+				c.fillRect(0, ry, W, 36);
+				c.lineWidth = 5;
+				c.strokeStyle = "#0b0e12";
+				c.strokeRect(0, ry, W, 36);
+			}
+			for (const px of posts) {
+				c.fillStyle = "#483b34";
+				c.fillRect(px, H * 0.56, 52, H * 0.46);
+				c.strokeStyle = "#090c10";
+				c.lineWidth = 5;
+				c.strokeRect(px, H * 0.56, 52, H * 0.46);
+				c.fillStyle = "#615149";
+				c.fillRect(px - 4, H * 0.54, 60, 22);
+				c.strokeRect(px - 4, H * 0.54, 60, 22);
+			}
+		}
+		c.restore();
+	}
+
+	function drawOtsBlurEdge(c, side, W, H, variant = "dark") {
+		c.save();
+		try {
+			c.filter = "blur(12px)";
+		} catch {
+			// Fallback without canvas filter
+		}
+		if (variant === "ots_head_right") {
+			// Giant foreground head & black cuff on right reading phone on left
+			c.fillStyle = "rgba(8, 12, 18, 0.96)";
+			c.beginPath();
+			c.arc(W * 0.95, H * 0.25, 590, 0, Math.PI * 2);
+			c.fill();
+			c.fillStyle = "rgba(220, 228, 238, 0.95)";
+			c.beginPath();
+			c.arc(W * 0.93, H * 0.26, 480, 0, Math.PI * 2);
+			c.fill();
+			c.fillStyle = "rgba(9, 13, 19, 0.96)";
+			c.beginPath();
+			c.ellipse(W * 0.72, H * 0.76, 260, 120, 0.35, 0, Math.PI * 2);
+			c.fill();
+		} else {
+			const bx = side === "left" ? 130 : W - 150;
+			const lg = c.createLinearGradient(
+				side === "left" ? 0 : W,
+				0,
+				side === "left" ? 360 : W - 360,
+				0,
+			);
+			lg.addColorStop(0, "rgba(7, 10, 15, 0.96)");
+			lg.addColorStop(0.65, "rgba(12, 17, 25, 0.85)");
+			lg.addColorStop(1, "rgba(12, 17, 25, 0)");
+			c.fillStyle = lg;
+			c.fillRect(side === "left" ? -30 : bx - 170, H * 0.22, 420, H * 0.85);
+		}
+		c.restore();
 	}
 
 	// Render any scene onto a virtual 1920x1080 stage (auto-adapted when output canvas is 9:16 vertical!)
@@ -920,6 +1746,22 @@
 			(data.mouthEnv && data.mouthEnv[id] && data.mouthEnv[id][frameIdx]) || 0;
 		const bgImg = getBgCanvas(sc.bg || "dark_lab", W, H);
 		ctx.drawImage(bgImg, 0, 0);
+
+		const customBg = getCachedImage(sc.bgImageUrl || sc.sceneImageUrl);
+		if (customBg) {
+			const iw = customBg.naturalWidth || W;
+			const ih = customBg.naturalHeight || H;
+			const coverScale = Math.max(W / iw, H / ih);
+			ctx.drawImage(
+				customBg,
+				(W - iw * coverScale) / 2,
+				(H - ih * coverScale) / 2,
+				iw * coverScale,
+				ih * coverScale,
+			);
+			ctx.fillStyle = "rgba(8, 13, 21, 0.24)";
+			ctx.fillRect(0, 0, W, H);
+		}
 
 		const L = sc.layout || "two_shot";
 		const title = sc.cardTitle || "";
@@ -1524,6 +2366,279 @@
 			return;
 		}
 
+		if (L === "ots_phone_groupchat") {
+			ctx.save();
+			ctx.translate(478, 588);
+			ctx.rotate(-0.155);
+			ctx.scale(0.91, 0.91);
+			const pw = 560;
+			const ph = 830;
+			roundRectPath(ctx, -pw / 2 - 14, -ph / 2 - 14, pw + 28, ph + 28, 38);
+			ctx.fillStyle = "#0a0e14";
+			ctx.fill();
+			ctx.lineWidth = 4;
+			ctx.strokeStyle = "#2b394a";
+			ctx.stroke();
+
+			roundRectPath(ctx, -pw / 2, -ph / 2, pw, ph, 26);
+			ctx.fillStyle = "#eef2f7";
+			ctx.fill();
+			ctx.save();
+			ctx.clip();
+
+			// Chat group header bar
+			ctx.fillStyle = "#dce3ec";
+			ctx.fillRect(-pw / 2, -ph / 2, pw, 98);
+			ctx.strokeStyle = "#b7c3d1";
+			ctx.lineWidth = 2;
+			ctx.beginPath();
+			ctx.moveTo(-pw / 2, -ph / 2 + 98);
+			ctx.lineTo(pw / 2, -ph / 2 + 98);
+			ctx.stroke();
+
+			ctx.fillStyle = "#161d26";
+			ctx.font = "900 26px BeVietnamPro, sans-serif";
+			ctx.textAlign = "left";
+			ctx.textBaseline = "middle";
+			ctx.fillText(
+				`←  ${(title || "NHÓM CẮN CHẾT QUẢN LÝ").slice(0, 26)}`,
+				-pw / 2 + 24,
+				-ph / 2 + 54,
+			);
+
+			const defaultRows = [
+				"parrot|Vẹt Sát Thủ",
+				"gorilla|King Kong",
+				"tiger|Hổ Một Đấm",
+				"elephant|Voi Già Ăn Chay",
+			];
+			const defaultIcons = [
+				"parrot",
+				"gorilla",
+				"tiger",
+				"elephant",
+				"skull",
+				"hacker",
+			];
+			const rawRows = lines.length ? lines.slice(0, 4) : defaultRows;
+			rawRows.forEach((rawRow, idx) => {
+				const parts = String(rawRow).split("|");
+				const rowIcon =
+					parts.length > 1
+						? parts[0].trim()
+						: defaultIcons[idx % defaultIcons.length];
+				const rowName = (parts.length > 1 ? parts[1] : parts[0]).trim();
+				const ry = -ph / 2 + 124 + idx * 168;
+				ctx.save();
+				ctx.translate(-pw / 2 + 26, ry);
+				drawAvatarPortrait(ctx, rowIcon, 126, null);
+				ctx.restore();
+				ctx.fillStyle = "#131922";
+				ctx.font = "800 33px BeVietnamPro, sans-serif";
+				ctx.textAlign = "left";
+				ctx.textBaseline = "middle";
+				ctx.fillText(rowName.slice(0, 22), -pw / 2 + 174, ry + 63);
+				ctx.strokeStyle = "rgba(150, 165, 184, 0.45)";
+				ctx.lineWidth = 2;
+				ctx.beginPath();
+				ctx.moveTo(-pw / 2 + 174, ry + 148);
+				ctx.lineTo(pw / 2 - 22, ry + 148);
+				ctx.stroke();
+			});
+
+			ctx.restore();
+			ctx.restore();
+			drawOtsBlurEdge(ctx, "right", W, H, "ots_head_right");
+			return;
+		}
+
+		if (L === "floating_chat_scene") {
+			// Background lurking mini figure for depth
+			drawCharacter(ctx, rivalDef, {
+				x: 910,
+				y: 445,
+				scale: 0.44,
+				facing: -1,
+				emotion: "cold",
+				t,
+			});
+
+			drawCharacter(ctx, mainDef, {
+				x: 375,
+				y: 550,
+				scale: 1.72,
+				facing: 1,
+				emotion: sc.leftEmotion || "dread",
+				mouthOpen: sc.speaker === mainId ? getMouth(mainId) : 0,
+				pose: "hold_phone",
+				t,
+			});
+
+			drawForegroundBarrier(
+				ctx,
+				sc.foregroundType && sc.foregroundType !== "none"
+					? sc.foregroundType
+					: "wood_fence",
+				W,
+				H,
+			);
+			drawOtsBlurEdge(ctx, "right", W, H, "dark");
+
+			// Floating Pop-In Group Chat HUD Card (crisp foreground layer)
+			const pop = easeOutBack(clamp(localT / 0.28, 0, 1));
+			const msgLinesRaw = lines.length ? lines : sc.text ? [sc.text] : ["..."];
+			ctx.save();
+			ctx.translate(1240, 390);
+			ctx.scale(0.84 + 0.16 * pop, 0.84 + 0.16 * pop);
+			ctx.translate(-1240, -390);
+
+			const avX = 765;
+			const avY = 185;
+			const avSize = 176;
+			ctx.save();
+			ctx.shadowColor = "rgba(0,0,0,0.65)";
+			ctx.shadowBlur = 18;
+			ctx.translate(avX, avY);
+			drawAvatarPortrait(
+				ctx,
+				sc.avatarIcon || "elephant",
+				avSize,
+				getCachedImage(sc.avatarImageUrl),
+			);
+			ctx.restore();
+
+			// Sender display name with crisp dark outer outline
+			const senderLabel = (title || "Voi Già Ăn Chay").slice(0, 30);
+			ctx.font = "900 40px BeVietnamPro, sans-serif";
+			ctx.textAlign = "left";
+			ctx.textBaseline = "middle";
+			ctx.lineWidth = 9;
+			ctx.strokeStyle = "#080b10";
+			ctx.strokeText(senderLabel, 965, 224);
+			ctx.fillStyle = "#ffffff";
+			ctx.fillText(senderLabel, 965, 224);
+
+			// Gradient silver-white message card
+			ctx.font = "800 34px BeVietnamPro, sans-serif";
+			const wrappedMsg = [];
+			for (const rawL of msgLinesRaw) {
+				wrappedMsg.push(...wrapLines(ctx, rawL, 745));
+			}
+			const visMsg = wrappedMsg.slice(0, 4);
+			const boxW = 815;
+			const boxH = Math.max(150, visMsg.length * 46 + 48);
+			const boxX = 960;
+			const boxY = 264;
+
+			ctx.save();
+			ctx.shadowColor = "rgba(0,0,0,0.65)";
+			ctx.shadowBlur = 22;
+			roundRectPath(ctx, boxX, boxY, boxW, boxH, 16);
+			const cg = ctx.createLinearGradient(boxX, boxY, boxX, boxY + boxH);
+			cg.addColorStop(0, "#ffffff");
+			cg.addColorStop(1, "#cfd8e3");
+			ctx.fillStyle = cg;
+			ctx.fill();
+			ctx.lineWidth = 5;
+			ctx.strokeStyle = "#0d121a";
+			ctx.stroke();
+			ctx.restore();
+
+			ctx.fillStyle = "#0e1520";
+			ctx.font = "800 34px BeVietnamPro, sans-serif";
+			ctx.textAlign = "left";
+			ctx.textBaseline = "middle";
+			visMsg.forEach((ln, idx) => {
+				ctx.fillText(ln, boxX + 34, boxY + 46 + idx * 46);
+			});
+
+			ctx.restore();
+			return;
+		}
+
+		if (L === "creature_enclosure") {
+			drawCreatureCutout(
+				ctx,
+				sc.avatarIcon || "tiger",
+				1320,
+				455,
+				1.75,
+				t,
+				getCachedImage(sc.cutoutImageUrl),
+			);
+			drawCharacter(ctx, mainDef, {
+				x: 495,
+				y: 550,
+				scale: 1.74,
+				facing: 1,
+				emotion: sc.leftEmotion || "dread",
+				mouthOpen: sc.speaker === mainId ? getMouth(mainId) : 0,
+				pose:
+					sc.speaker === mainId && getMouth(mainId) > 0.06
+						? "talk"
+						: "hold_phone",
+				t,
+			});
+			drawForegroundBarrier(
+				ctx,
+				sc.foregroundType && sc.foregroundType !== "none"
+					? sc.foregroundType
+					: "iron_cage",
+				W,
+				H,
+			);
+			if (title) {
+				ctx.save();
+				roundRectPath(ctx, 1020, 128, 600, 68, 12);
+				ctx.fillStyle = "rgba(10, 15, 23, 0.86)";
+				ctx.fill();
+				ctx.lineWidth = 3;
+				ctx.strokeStyle = "#ff4d5a";
+				ctx.stroke();
+				ctx.fillStyle = "#ffd8dc";
+				ctx.font = "900 28px BeVietnamPro, sans-serif";
+				ctx.textAlign = "center";
+				ctx.textBaseline = "middle";
+				ctx.fillText(title.slice(0, 36), 1320, 162);
+				ctx.restore();
+			}
+			drawOtsBlurEdge(ctx, "left", W, H, "dark");
+			return;
+		}
+
+		if (L === "fence_two_shot") {
+			drawCharacter(ctx, mainDef, {
+				x: 490,
+				y: 545,
+				scale: 1.66,
+				facing: 1,
+				emotion: sc.leftEmotion || "dread",
+				mouthOpen: getMouth(mainId),
+				pose: getMouth(mainId) > 0.06 ? "talk" : "hold_phone",
+				t,
+			});
+			drawCharacter(ctx, rivalDef, {
+				x: 1185,
+				y: 545,
+				scale: 1.66,
+				facing: -1,
+				emotion: sc.rightEmotion || "panic",
+				mouthOpen: getMouth(rivalId),
+				pose: getMouth(rivalId) > 0.06 ? "talk" : "idle",
+				t,
+			});
+			drawForegroundBarrier(
+				ctx,
+				sc.foregroundType && sc.foregroundType !== "none"
+					? sc.foregroundType
+					: "wood_fence",
+				W,
+				H,
+			);
+			drawOtsBlurEdge(ctx, "right", W, H, "dark");
+			return;
+		}
+
 		// Default: Dynamic Medium Two-Shot
 		drawCharacter(ctx, mainDef, {
 			x: 640,
@@ -1546,6 +2661,9 @@
 			pose: getMouth(rivalId) > 0.06 ? "talk" : "idle",
 			t,
 		});
+		if (sc.foregroundType && sc.foregroundType !== "none") {
+			drawForegroundBarrier(ctx, sc.foregroundType, W, H);
+		}
 	}
 
 	function renderAtOnCanvas(canvas, data, t) {
@@ -1623,33 +2741,106 @@
 			ctx.fillRect(0, 0, outW, outH);
 		}
 
-		// Channel badge top-left
+		// Chrome & Watermark: Cáo Hồi Hộp (v2.0) vs Thỏ Kì Quái (v1.0)
 		const uiScale = isVertical ? outW / 1080 : outW / 1920;
 		const watermark = data.channelName || "Hồ Sơ Lật Kèo";
-		ctx.save();
-		ctx.scale(uiScale, uiScale);
-		ctx.beginPath();
-		ctx.arc(46, 46, 26, 0, Math.PI * 2);
-		ctx.fillStyle = "#f2e5b5";
-		ctx.fill();
-		ctx.lineWidth = 2.5;
-		ctx.strokeStyle = "rgba(0,0,0,0.65)";
-		ctx.stroke();
-		ctx.fillStyle = "#11161c";
-		ctx.beginPath();
-		ctx.arc(46, 51, 10, 0, Math.PI * 2);
-		ctx.fill();
-		ctx.beginPath();
-		ctx.ellipse(42, 34, 4, 11, -0.22, 0, Math.PI * 2);
-		ctx.ellipse(50, 34, 4, 11, 0.22, 0, Math.PI * 2);
-		ctx.fill();
+		const isCaoHoiHop = data.visualStyle === "cao_hoi_hop";
+		const barH = isCaoHoiHop
+			? Math.round((isVertical ? 110 : 76) * uiScale)
+			: 0;
 
-		ctx.fillStyle = "rgba(255, 255, 255, 0.58)";
-		ctx.font = "700 25px BeVietnamPro, sans-serif";
-		ctx.textAlign = "left";
-		ctx.textBaseline = "middle";
-		ctx.fillText(watermark, 84, 47);
-		ctx.restore();
+		if (isCaoHoiHop) {
+			const barCanvas = getLetterboxBarCanvas(outW, barH);
+			ctx.drawImage(barCanvas, 0, 0);
+			ctx.drawImage(barCanvas, 0, outH - barH);
+
+			ctx.save();
+			ctx.strokeStyle = "#04080e";
+			ctx.lineWidth = Math.max(2, 3 * uiScale);
+			ctx.beginPath();
+			ctx.moveTo(0, barH);
+			ctx.lineTo(outW, barH);
+			ctx.moveTo(0, outH - barH);
+			ctx.lineTo(outW, outH - barH);
+			ctx.stroke();
+
+			ctx.scale(uiScale, uiScale);
+			const topRingColors = ["#301419", "#2c4f86", "#133f42"];
+			topRingColors.forEach((col, idx) => {
+				const cx = 42 + idx * 54;
+				const cy = isVertical ? 55 : 38;
+				ctx.beginPath();
+				ctx.arc(cx, cy, 21, 0, Math.PI * 2);
+				ctx.fillStyle = col;
+				ctx.fill();
+				ctx.lineWidth = 4;
+				ctx.strokeStyle = "#06090e";
+				ctx.stroke();
+			});
+
+			// Subtle hollow corner rings on bottom-right letterbox
+			const logicalW = outW / uiScale;
+			const logicalH = outH / uiScale;
+			for (let idx = 0; idx < 3; idx++) {
+				const cx = logicalW - 42 - idx * 54;
+				const cy = logicalH - (isVertical ? 55 : 38);
+				ctx.beginPath();
+				ctx.arc(cx, cy, 20, 0, Math.PI * 2);
+				ctx.lineWidth = 3.5;
+				ctx.strokeStyle = "rgba(4, 8, 15, 0.72)";
+				ctx.stroke();
+			}
+
+			// Top-right stylized channel emblem
+			const wmUpper = watermark.toUpperCase();
+			ctx.font = "900 32px BeVietnamPro, sans-serif";
+			ctx.textAlign = "right";
+			ctx.textBaseline = "middle";
+			const wmW = ctx.measureText(wmUpper).width;
+			const emX = logicalW - wmW - 36;
+			const emY = isVertical ? 55 : 38;
+			ctx.fillStyle = "rgba(185, 32, 48, 0.85)";
+			ctx.beginPath();
+			ctx.moveTo(emX - 30, emY - 12);
+			ctx.lineTo(emX + 8, emY - 18);
+			ctx.lineTo(emX - 4, emY + 18);
+			ctx.closePath();
+			ctx.fill();
+
+			ctx.shadowColor = "rgba(72, 220, 255, 0.55)";
+			ctx.shadowBlur = 10;
+			ctx.lineWidth = 5;
+			ctx.strokeStyle = "#06090e";
+			ctx.strokeText(wmUpper, logicalW - 24, emY);
+			ctx.fillStyle = "#e8f8ff";
+			ctx.fillText(wmUpper, logicalW - 24, emY);
+			ctx.restore();
+		} else {
+			ctx.save();
+			ctx.scale(uiScale, uiScale);
+			ctx.beginPath();
+			ctx.arc(46, 46, 26, 0, Math.PI * 2);
+			ctx.fillStyle = "#f2e5b5";
+			ctx.fill();
+			ctx.lineWidth = 2.5;
+			ctx.strokeStyle = "rgba(0,0,0,0.65)";
+			ctx.stroke();
+			ctx.fillStyle = "#11161c";
+			ctx.beginPath();
+			ctx.arc(46, 51, 10, 0, Math.PI * 2);
+			ctx.fill();
+			ctx.beginPath();
+			ctx.ellipse(42, 34, 4, 11, -0.22, 0, Math.PI * 2);
+			ctx.ellipse(50, 34, 4, 11, 0.22, 0, Math.PI * 2);
+			ctx.fill();
+
+			ctx.fillStyle = "rgba(255, 255, 255, 0.58)";
+			ctx.font = "700 25px BeVietnamPro, sans-serif";
+			ctx.textAlign = "left";
+			ctx.textBaseline = "middle";
+			ctx.fillText(watermark, 84, 47);
+			ctx.restore();
+		}
 
 		// Subtitle pill bottom
 		const subs = data.subs || [];
@@ -1665,42 +2856,54 @@
 		}
 		if (activeSub && activeSub.text) {
 			ctx.save();
-			const fontPx = Math.round((isVertical ? 40 : 38) * uiScale);
-			ctx.font = `800 ${fontPx}px BeVietnamPro, sans-serif`;
+			const subDisplay = isCaoHoiHop
+				? activeSub.text.toUpperCase()
+				: activeSub.text;
+			const fontPx = Math.round((isVertical ? 36 : 33) * uiScale);
+			ctx.font = `${isCaoHoiHop ? 900 : 800} ${fontPx}px BeVietnamPro, sans-serif`;
 			ctx.textAlign = "center";
 			ctx.textBaseline = "middle";
 
-			const maxBoxW = outW - 90 * uiScale;
-			const linesSub = wrapLines(
-				ctx,
-				activeSub.text,
-				maxBoxW - 48 * uiScale,
-			).slice(0, 2);
+			const maxBoxW = outW - (isCaoHoiHop ? 220 : 90) * uiScale;
+			const linesSub = wrapLines(ctx, subDisplay, maxBoxW - 72 * uiScale).slice(
+				0,
+				2,
+			);
 			const widest = Math.max(
 				...linesSub.map((l) => ctx.measureText(l).width),
 				120,
 			);
-			const boxW = Math.min(maxBoxW, widest + 52 * uiScale);
-			const lineH = fontPx * 1.28;
-			const boxH = linesSub.length * lineH + 20 * uiScale;
+			const boxW = Math.min(maxBoxW, widest + 64 * uiScale);
+			const lineH = fontPx * 1.26;
+			const boxH = linesSub.length * lineH + 18 * uiScale;
 			const boxX = (outW - boxW) / 2;
-			const boxY = outH - boxH - (isVertical ? 180 * uiScale : 36 * uiScale);
+			const boxY = isCaoHoiHop
+				? outH - barH - (linesSub.length > 1 ? boxH * 0.55 : boxH * 0.42)
+				: outH - boxH - (isVertical ? 180 * uiScale : 36 * uiScale);
 
 			roundRectPath(ctx, boxX, boxY, boxW, boxH, 10 * uiScale);
-			ctx.fillStyle = "rgba(6, 9, 13, 0.78)";
+			ctx.fillStyle = isCaoHoiHop
+				? "rgba(7, 10, 16, 0.90)"
+				: "rgba(6, 9, 13, 0.78)";
 			ctx.fill();
+			if (isCaoHoiHop) {
+				ctx.lineWidth = Math.max(1.5, 2 * uiScale);
+				ctx.strokeStyle = "rgba(180, 200, 230, 0.25)";
+				ctx.stroke();
+			}
 
 			ctx.lineWidth = Math.max(2, 4 * uiScale);
 			ctx.strokeStyle = "rgba(0,0,0,0.9)";
-			ctx.fillStyle =
-				activeSub.speaker === "rival"
+			ctx.fillStyle = isCaoHoiHop
+				? "#ffffff"
+				: activeSub.speaker === "rival"
 					? "#ffe8a3"
 					: activeSub.speaker === "ai"
 						? "#ff9ea8"
 						: "#ffffff";
 
 			linesSub.forEach((ln, idx) => {
-				const ty = boxY + 12 * uiScale + lineH * (idx + 0.5);
+				const ty = boxY + 10 * uiScale + lineH * (idx + 0.5);
 				ctx.strokeText(ln, outW / 2, ty);
 				ctx.fillText(ln, outW / 2, ty);
 			});
@@ -1708,7 +2911,7 @@
 		}
 	}
 
-	window.StickmanEngine = { renderAtOnCanvas };
+	window.StickmanEngine = { renderAtOnCanvas, preloadImages };
 
 	// Standalone worker page mode (when loaded by render_worker)
 	window.renderAt = function (t) {

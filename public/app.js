@@ -1,7 +1,83 @@
 (function () {
+	const CAO_HOI_HOP_STORY = {
+		title: "[v2.0] Tôi Lọt Vào Nhóm Chat Bạo Động Của Sở Thú",
+		channelName: "Cáo Hồi Hộp",
+		visualStyle: "cao_hoi_hop",
+		scenes: [
+			{
+				act: 1,
+				speaker: "main",
+				bg: "zoo_enclosure",
+				layout: "ots_phone_groupchat",
+				cardTitle: "NHÓM CẮN CHẾT QUẢN LÝ",
+				cardLines: [
+					"parrot|Vẹt Sát Thủ",
+					"gorilla|King Kong",
+					"tiger|Hổ Một Đấm",
+					"elephant|Voi Già Ăn Chay",
+				],
+				sfx: "chat_pop",
+				cam: { z0: 1.0, z1: 1.05, shake: 0.08 },
+				text: "Vừa nhận ca trực đêm ở sở thú bỏ hoang, điện thoại tôi rung lên vì bị kéo thẳng vào nhóm chat bí mật mang tên Cắn Chết Quản Lý.",
+			},
+			{
+				act: 2,
+				speaker: "rival",
+				bg: "zoo_enclosure",
+				layout: "fence_two_shot",
+				leftEmotion: "dread",
+				rightEmotion: "panic",
+				foregroundType: "wood_fence",
+				sfx: "heartbeat_thump",
+				cam: { z0: 1.0, z1: 1.04, shake: 0.05 },
+				text: "Đồng nghiệp hói đầu run lẩy bẩy dặn tôi tuyệt đối không được mở khóa chuồng số bốn sau hai mươi hai giờ đêm dù có tiếng gõ cửa.",
+			},
+			{
+				act: 3,
+				speaker: "boss",
+				bg: "zoo_enclosure",
+				layout: "floating_chat_scene",
+				leftEmotion: "dread",
+				avatarIcon: "elephant",
+				foregroundType: "wood_fence",
+				cardTitle: "Voi Già Ăn Chay",
+				cardLines: [
+					"Tao ăn chay, nhưng có thể giúp tụi mày giẫm nát xương thằng quản lý mới.",
+				],
+				sfx: "chat_pop",
+				cam: { z0: 1.01, z1: 1.07, shake: 0.12 },
+				text: "Ngay lúc đó, tài khoản Voi Già Ăn Chay thả một dòng tin nhắn rợn người khiến sống lưng tôi lạnh toát giữa khu chuồng tối.",
+			},
+			{
+				act: 4,
+				speaker: "main",
+				bg: "haunted_corridor",
+				layout: "creature_enclosure",
+				leftEmotion: "dread",
+				avatarIcon: "tiger",
+				foregroundType: "iron_cage",
+				cardTitle: "CẤM MỞ CỬA SAU 22:00",
+				sfx: "beast_growl",
+				cam: { z0: 1.0, z1: 1.09, shake: 0.25 },
+				text: "Bên ngoài song sắt hành lang, đôi mắt trắng dã của con hổ dữ lóe sáng trong bóng tối, nhưng nó không biết tôi đã bật sẵn còi khóa toàn khu.",
+			},
+			{
+				act: 5,
+				speaker: "main",
+				bg: "dark_noir",
+				layout: "ecu_main",
+				leftEmotion: "dread",
+				sfx: "dark_boom",
+				cam: { z0: 1.02, z1: 1.1, shake: 0.15 },
+				text: "Bởi vì quy tắc thật sự của sở thú này không phải là giữ mạng cho nhân viên, mà là thử xem ai mới là kẻ đứng sau màn hình kích hoạt cuộc bạo động.",
+			},
+		],
+	};
+
 	const DEMO_STORY = {
 		title: "[Demo] Tôi bẫy ngược thằng bạn thân học lỏm code định ám sát mình",
 		channelName: "Hồ Sơ Lật Kèo",
+		visualStyle: "tho_ki_quai",
 		scenes: [
 			{
 				act: 1,
@@ -85,7 +161,7 @@
 		],
 	};
 
-	let currentStory = JSON.parse(JSON.stringify(DEMO_STORY));
+	let currentStory = JSON.parse(JSON.stringify(CAO_HOI_HOP_STORY));
 	let selectedIdx = 0;
 	let previewAnimId = null;
 
@@ -116,7 +192,10 @@
 				name: el("charRivalName").value.trim() || "Trọng Tính",
 				badge: el("charRivalBadge").value.trim(),
 				shirtColor: el("charRivalColor").value,
-				hairStyle: "slick_side",
+				hairStyle:
+					el("visualStyle").value === "cao_hoi_hop"
+						? "sparse_bald"
+						: "slick_side",
 				hairColor: "#3d2d27",
 				voicePreset: el("charRivalVoice").value,
 			},
@@ -158,7 +237,10 @@
 					{
 						start: cur,
 						end: cur + dur,
-						text: s.text.slice(0, 68),
+						text:
+							s.text.length > 62
+								? s.text.slice(0, 62).replace(/\s+\S*$/, "")
+								: s.text,
 						speaker: s.speaker,
 					},
 				],
@@ -185,6 +267,7 @@
 			data: {
 				title: currentStory.title,
 				channelName: el("channelName").value.trim() || "Hồ Sơ Lật Kèo",
+				visualStyle: el("visualStyle").value,
 				width,
 				height,
 				fps: 30,
@@ -212,8 +295,19 @@
 		el("scSpeaker").value = sc.speaker || "main";
 		el("scLayout").value = sc.layout || "two_shot";
 		el("scBg").value = sc.bg || "dark_lab";
+		el("scAvatarIcon").value = sc.avatarIcon || "elephant";
+		el("scForeground").value = sc.foregroundType || "none";
 		el("scCardTitle").value = sc.cardTitle || "";
 		el("scText").value = sc.text || "";
+	}
+
+	function preloadStoryImagesAndRedraw() {
+		if (window.StickmanEngine && window.StickmanEngine.preloadImages) {
+			window.StickmanEngine.preloadImages(currentStory, () =>
+				redrawPreview(1.25),
+			);
+		}
+		redrawPreview(1.25);
 	}
 
 	function renderScenesList() {
@@ -241,13 +335,23 @@
 	}
 
 	// Bind inspector edits
-	["scSpeaker", "scLayout", "scBg", "scCardTitle", "scText"].forEach((id) => {
+	[
+		"scSpeaker",
+		"scLayout",
+		"scBg",
+		"scAvatarIcon",
+		"scForeground",
+		"scCardTitle",
+		"scText",
+	].forEach((id) => {
 		el(id).addEventListener("input", () => {
 			const sc = currentStory.scenes[selectedIdx];
 			if (!sc) return;
 			sc.speaker = el("scSpeaker").value;
 			sc.layout = el("scLayout").value;
 			sc.bg = el("scBg").value;
+			sc.avatarIcon = el("scAvatarIcon").value;
+			sc.foregroundType = el("scForeground").value;
 			sc.cardTitle = el("scCardTitle").value;
 			sc.text = el("scText").value;
 			renderScenesList();
@@ -256,6 +360,7 @@
 	});
 
 	[
+		"visualStyle",
 		"aspectRatio",
 		"channelName",
 		"charMainName",
@@ -318,12 +423,76 @@
 		previewAnimId = requestAnimationFrame(tick);
 	});
 
-	el("btnLoadDemo").addEventListener("click", () => {
-		currentStory = JSON.parse(JSON.stringify(DEMO_STORY));
+	el("btnLoadCaoHoiHop").addEventListener("click", () => {
+		currentStory = JSON.parse(JSON.stringify(CAO_HOI_HOP_STORY));
+		el("visualStyle").value = "cao_hoi_hop";
+		el("channelName").value = "Cáo Hồi Hộp";
 		selectedIdx = 0;
 		renderScenesList();
 		syncInspector();
-		redrawPreview(1.25);
+		preloadStoryImagesAndRedraw();
+	});
+
+	el("btnLoadDemo").addEventListener("click", () => {
+		currentStory = JSON.parse(JSON.stringify(DEMO_STORY));
+		el("visualStyle").value = "tho_ki_quai";
+		el("channelName").value = "Hồ Sơ Lật Kèo";
+		selectedIdx = 0;
+		renderScenesList();
+		syncInspector();
+		preloadStoryImagesAndRedraw();
+	});
+
+	el("btnUploadSceneBg").addEventListener("click", () => {
+		el("fileSceneBg").click();
+	});
+	el("fileSceneBg").addEventListener("change", (ev) => {
+		const f = ev.target.files && ev.target.files[0];
+		if (!f) return;
+		const reader = new FileReader();
+		reader.onload = () => {
+			const sc = currentStory.scenes[selectedIdx];
+			if (!sc) return;
+			sc.bgImageUrl = String(reader.result || "");
+			preloadStoryImagesAndRedraw();
+		};
+		reader.readAsDataURL(f);
+	});
+
+	el("btnGenSceneArt").addEventListener("click", async () => {
+		const sc = currentStory.scenes[selectedIdx];
+		if (!sc) return;
+		const btn = el("btnGenSceneArt");
+		const orig = btn.textContent;
+		const apiKey = el("apiKey").value.trim();
+		if (!apiKey) {
+			alert(
+				"Hãy dán Gemini API Key ở Bước 01 để AI vẽ ảnh nền dark-comic (hoặc dùng nút Tải Ảnh Nền Lên miễn phí).",
+			);
+			return;
+		}
+		btn.disabled = true;
+		btn.textContent = "⏳ Nano Banana 2.1 đang vẽ...";
+		try {
+			const res = await fetch("/api/generate-scene-art", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					apiKey,
+					aspectRatio: el("aspectRatio").value,
+					prompt: `Dark moody midnight comic-book illustration background (no text, no speech bubbles, wide shot): ${sc.bg || "zoo_enclosure"}. Scene mood: ${sc.cardTitle || ""} - ${sc.text || "suspense night thriller"}`,
+				}),
+			});
+			const data = await res.json();
+			if (!res.ok) throw new Error(data.error || "Lỗi gọi Nano Banana 2.1");
+			sc.bgImageUrl = data.dataUrl;
+			preloadStoryImagesAndRedraw();
+		} catch (err) {
+			alert(err.message);
+		} finally {
+			btn.disabled = false;
+			btn.textContent = orig;
+		}
 	});
 
 	// AI Story Expansion
@@ -349,6 +518,7 @@
 					targetMinutes: Number(el("targetMinutes").value),
 					characters: readCharactersFromInputs(),
 					channelName: el("channelName").value.trim(),
+					visualStyle: el("visualStyle").value,
 				}),
 			});
 			const data = await res.json();
@@ -385,6 +555,7 @@
 				targetMinutes: Number(el("targetMinutes").value),
 				characters: readCharactersFromInputs(),
 				channelName: el("channelName").value.trim(),
+				visualStyle: el("visualStyle").value,
 			}),
 		});
 		const data = await res.json();
@@ -406,6 +577,7 @@
 				body: JSON.stringify({
 					rawJson,
 					channelName: el("channelName").value.trim(),
+					visualStyle: el("visualStyle").value,
 				}),
 			});
 			const data = await res.json();
@@ -446,6 +618,7 @@
 					story: {
 						...currentStory,
 						channelName: el("channelName").value.trim() || "Hồ Sơ Lật Kèo",
+						visualStyle: el("visualStyle").value,
 						characters: readCharactersFromInputs(),
 					},
 				}),

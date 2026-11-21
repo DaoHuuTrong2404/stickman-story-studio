@@ -127,12 +127,14 @@ async function expandStoryWithAI({
 	targetMinutes = 5,
 	characters,
 	channelName,
+	visualStyle = "cao_hoi_hop",
 }) {
 	const prompt = buildExpansionPrompt({
 		roughIdea,
 		targetMinutes,
 		characters,
 		channelName,
+		visualStyle,
 	});
 
 	if (provider === "openai_compat") {
@@ -161,7 +163,10 @@ async function expandStoryWithAI({
 			throw new Error(data?.error?.message || `HTTP ${res.status}`);
 		}
 		const content = data?.choices?.[0]?.message?.content || "";
-		return sanitizeStorySpec(extractJsonObject(content), { channelName });
+		return sanitizeStorySpec(extractJsonObject(content), {
+			channelName,
+			visualStyle,
+		});
 	}
 
 	// Default: Official Gemini v1 Interactions API (`POST /v1/interactions`)
@@ -212,7 +217,79 @@ async function expandStoryWithAI({
 		}
 		outText = texts.join("\n");
 	}
-	return sanitizeStorySpec(extractJsonObject(outText), { channelName });
+	return sanitizeStorySpec(extractJsonObject(outText), {
+		channelName,
+		visualStyle,
+	});
+}
+
+async function generateSceneArtWithAI({
+	apiKey = "",
+	prompt = "",
+	aspectRatio = "16:9",
+	target = "bg",
+}) {
+	if (!apiKey) {
+		throw new Error("Cần Gemini API Key để dùng Nano Banana 2.1 vẽ nền AI.");
+	}
+	const ratio =
+		target === "avatar" || target === "cutout"
+			? "1:1"
+			: aspectRatio === "9:16"
+				? "9:16"
+				: "16:9";
+	const res = await fetch(
+		"https://generativelanguage.googleapis.com/v1beta/interactions",
+		{
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"Api-Revision": "2026-05-20",
+				"x-goog-api-key": apiKey,
+			},
+			body: JSON.stringify({
+				model: "gemini-nano-banana-2.1",
+				input: String(prompt || "Dark comic moody midnight background").slice(
+					0,
+					1200,
+				),
+				response_format: {
+					type: "image",
+					mime_type: "image/jpeg",
+					aspect_ratio: ratio,
+					image_size: "1K",
+				},
+				store: false,
+			}),
+		},
+	);
+	const data = await res.json();
+	if (!res.ok) {
+		throw new Error(
+			data?.error?.message || JSON.stringify(data?.error || data).slice(0, 300),
+		);
+	}
+
+	let imgPart = data?.output_image || null;
+	if (!imgPart?.data && Array.isArray(data?.outputs)) {
+		imgPart = data.outputs.find((o) => o?.type === "image" && o?.data) || null;
+	}
+	if (!imgPart?.data && Array.isArray(data?.steps)) {
+		for (const step of data.steps) {
+			if (Array.isArray(step?.content)) {
+				const found = step.content.find((p) => p?.type === "image" && p?.data);
+				if (found) {
+					imgPart = found;
+					break;
+				}
+			}
+		}
+	}
+	if (!imgPart?.data) {
+		throw new Error("Model không trả về dữ liệu ảnh hợp lệ.");
+	}
+	const mime = imgPart.mime_type || "image/jpeg";
+	return { dataUrl: `data:${mime};base64,${imgPart.data}` };
 }
 
 async function runRenderPipeline(jobId, spec, workersReq) {
@@ -534,7 +611,10 @@ const server = http.createServer(async (req, res) => {
 				typeof body.rawJson === "string"
 					? extractJsonObject(body.rawJson)
 					: body.rawJson;
-			const spec = sanitizeStorySpec(parsed, { channelName: body.channelName });
+			const spec = sanitizeStorySpec(parsed, {
+				channelName: body.channelName,
+				visualStyle: body.visualStyle,
+			});
 			return sendJson(res, 200, spec);
 		}
 
@@ -544,10 +624,17 @@ const server = http.createServer(async (req, res) => {
 			return sendJson(res, 200, spec);
 		}
 
+		if (req.method === "POST" && pathname === "/api/generate-scene-art") {
+			const body = await readJsonBody(req);
+			const result = await generateSceneArtWithAI(body);
+			return sendJson(res, 200, result);
+		}
+
 		if (req.method === "POST" && pathname === "/api/render") {
 			const body = await readJsonBody(req);
 			const cleanSpec = sanitizeStorySpec(body.story, {
 				channelName: body.story?.channelName,
+				visualStyle: body.story?.visualStyle,
 			});
 			const fullSpec = {
 				...cleanSpec,

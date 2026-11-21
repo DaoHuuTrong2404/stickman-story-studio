@@ -268,6 +268,34 @@ def make_sfx(kind: str, sr: int = 48000) -> np.ndarray:
                 rng.normal(0, 1, cl) * np.exp(-ct * 160) * 0.12
             ).astype(np.float32)
         return claps * env.astype(np.float32)
+    if kind == "chat_pop":
+        d = int(0.16 * sr)
+        t = np.arange(d) / sr
+        t1 = np.exp(-t * 36.0)
+        tone1 = np.sin(2 * np.pi * 880.0 * t) * t1 * (t < 0.065)
+        t_shift = np.maximum(0.0, t - 0.05)
+        tone2 = (
+            np.sin(2 * np.pi * 1318.5 * t_shift) * np.exp(-t_shift * 28.0) * (t >= 0.05)
+        )
+        return ((tone1 + tone2) * 0.34).astype(np.float32)
+    if kind == "heartbeat_thump":
+        d = int(0.58 * sr)
+        t = np.arange(d) / sr
+        lub = np.sin(2 * np.pi * 56.0 * t) * np.exp(-t * 16.0) * (t < 0.22)
+        dt2 = np.maximum(0.0, t - 0.22)
+        dub = np.sin(2 * np.pi * 48.0 * dt2) * np.exp(-dt2 * 14.0) * (t >= 0.22)
+        return (lub * 0.55 + dub * 0.44).astype(np.float32)
+    if kind == "beast_growl":
+        d = int(0.75 * sr)
+        t = np.arange(d) / sr
+        env = np.minimum(1.0, t / 0.08) * np.exp(-np.maximum(0.0, t - 0.18) * 3.8)
+        mod = np.sin(2 * np.pi * 24.0 * t) * 18.0
+        growl = (
+            np.sin(2 * np.pi * (72.0 + mod) * t) * 0.52
+            + np.sin(2 * np.pi * (108.0 + mod * 1.4) * t) * 0.28
+            + rng.normal(0, 0.14, d)
+        ) * env
+        return (growl * 0.42).astype(np.float32)
     # Default whoosh
     d = int(0.24 * sr)
     t = np.arange(d) / sr
@@ -343,6 +371,94 @@ def synthesize_noir_bgm(total_samples: int, sr: int) -> tuple[np.ndarray, np.nda
     return left, right
 
 
+def synthesize_thriller_bgm(
+    total_samples: int, sr: int, timeline_scenes: list
+) -> tuple[np.ndarray, np.ndarray]:
+    """A-minor dark suspense drone + heartbeat pulse + eerie chimes with tense silences."""
+    left = np.zeros(total_samples, dtype=np.float32)
+    right = np.zeros(total_samples, dtype=np.float32)
+    t_all = np.arange(total_samples, dtype=np.float32) / sr
+
+    # Low A-minor drone pad (55 Hz + 110 Hz + soft fifth 164.81 Hz)
+    lfo = 0.72 + 0.28 * np.sin(2 * np.pi * 0.18 * t_all)
+    drone = (
+        (
+            0.52 * np.sin(2 * np.pi * 55.0 * t_all)
+            + 0.32 * np.sin(2 * np.pi * 110.0 * t_all + 0.4)
+            + 0.16 * np.sin(2 * np.pi * 164.81 * t_all)
+        )
+        * lfo
+        * 0.16
+    )
+    left += drone.astype(np.float32)
+    right += drone.astype(np.float32)
+
+    # Sparse eerie high A-minor bell tones + rhythmic heartbeat sub-pulse
+    chimes = [880.0, 698.46, 659.25, 523.25, 440.0, 587.33]
+    beat_sec = 0.625
+    total_sec = total_samples / sr
+    step = 0
+    cur_t = 0.0
+    while cur_t < total_sec - 0.25:
+        i0 = int(cur_t * sr)
+        if step % 2 == 0:
+            hb_len = min(int(0.26 * sr), total_samples - i0)
+            if hb_len > 10:
+                ht = np.arange(hb_len, dtype=np.float32) / sr
+                thump = np.sin(2 * np.pi * 54.0 * ht) * np.exp(-ht * 15.0) * 0.22
+                left[i0 : i0 + hb_len] += thump
+                right[i0 : i0 + hb_len] += thump
+        if step % 3 == 0:
+            freq = chimes[(step // 3) % len(chimes)]
+            c_len = min(int(0.95 * sr), total_samples - i0)
+            if c_len > 10:
+                ct = np.arange(c_len, dtype=np.float32) / sr
+                bell = (
+                    (
+                        0.7 * np.sin(2 * np.pi * freq * ct)
+                        + 0.25 * np.sin(2 * np.pi * (freq * 2.01) * ct)
+                    )
+                    * np.minimum(1.0, ct / 0.025)
+                    * np.exp(-ct * 3.8)
+                )
+                pan = 0.5 + 0.3 * math.sin(step * 0.8)
+                left[i0 : i0 + c_len] += (bell * (1.0 - pan * 0.4) * 0.14).astype(
+                    np.float32
+                )
+                right[i0 : i0 + c_len] += (bell * (0.6 + pan * 0.4) * 0.14).astype(
+                    np.float32
+                )
+        cur_t += beat_sec
+        step += 1
+
+    # Deliberate suspense music dropouts at dread / shock reveals after 2.5s
+    env_mask = np.ones(total_samples, dtype=np.float32)
+    tense_layouts = {"floating_chat_scene", "creature_enclosure", "ecu_glow_eyes"}
+    for sc in timeline_scenes:
+        sc_start = float(sc.get("start", 0.0))
+        sc_dur = float(sc.get("end", 0.0)) - sc_start
+        if (
+            sc_start >= 2.5
+            and sc_dur >= 2.2
+            and (sc.get("layout") in tense_layouts or sc.get("leftEmotion") == "dread")
+        ):
+            d0 = int(sc_start * sr)
+            d1 = min(total_samples, int((sc_start + min(1.5, sc_dur * 0.45)) * sr))
+            if d1 > d0 + 100:
+                env_mask[d0:d1] = 0.05
+
+    smooth_k = np.ones(int(0.08 * sr), dtype=np.float32) / int(0.08 * sr)
+    env_smooth = np.convolve(env_mask, smooth_k, mode="same")
+    left *= env_smooth
+    right *= env_smooth
+
+    fade_n = min(int(1.2 * sr), total_samples)
+    fade = np.linspace(1.0, 0.0, fade_n, dtype=np.float32)
+    left[-fade_n:] *= fade
+    right[-fade_n:] *= fade
+    return left, right
+
+
 def main():
     job_dir = Path(sys.argv[1]).resolve()
     spec = json.loads((job_dir / "story_input.json").read_text(encoding="utf-8"))
@@ -355,6 +471,7 @@ def main():
     height = int(spec.get("height") or 1080)
     fps = int(spec.get("fps") or 30)
     channel_name = spec.get("channelName") or "Hồ Sơ Lật Kèo"
+    visual_style = spec.get("visualStyle") or "tho_ki_quai"
 
     sr = 48000
     total_sc = len(scenes)
@@ -544,7 +661,10 @@ def main():
             sfx_R[i0:i1] += fx[: i1 - i0] * 0.82
 
     print("PROGRESS_MIX:mastering", flush=True)
-    bgm_L, bgm_R = synthesize_noir_bgm(total_samples, sr)
+    if visual_style == "cao_hoi_hop" or spec.get("bgmStyle") == "thriller_drone":
+        bgm_L, bgm_R = synthesize_thriller_bgm(total_samples, sr, timeline_scenes)
+    else:
+        bgm_L, bgm_R = synthesize_noir_bgm(total_samples, sr)
 
     hop = 480
     abs_v = np.abs(voice_L)
@@ -612,6 +732,7 @@ def main():
     beats_out = {
         "title": spec.get("title") or "Stickman Story",
         "channelName": channel_name,
+        "visualStyle": visual_style,
         "width": width,
         "height": height,
         "fps": fps,

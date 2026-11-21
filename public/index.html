@@ -11,12 +11,13 @@
     <div class="brand">
       <div class="brand-badge">2D</div>
       <div>
-        <h1>STICKMAN STORY STUDIO</h1>
-        <span>Biến vài dòng ý tưởng thô thành phim hoạt hình lật kèo 1080p chuẩn Thỏ Kì Quái</span>
+        <h1>STICKMAN STORY STUDIO v2.0</h1>
+        <span>Biến vài dòng ý tưởng thô thành phim 2.5D 1080p (Chuẩn Cáo Hồi Hộp & Thỏ Kì Quái)</span>
       </div>
     </div>
     <div class="top-actions">
-      <button class="btn" id="btnLoadDemo">Nạp Mẫu Demo Sẵn</button>
+      <button class="btn btn-amber" id="btnLoadCaoHoiHop">🐺 Mẫu Cáo Hồi Hộp v2.0</button>
+      <button class="btn" id="btnLoadDemo">🐰 Mẫu Thỏ Kì Quái v1.0</button>
       <button class="btn" id="btnOpenNoKeyModal">Dùng Không Cần API Key (Copy/Dán JSON)</button>
     </div>
   </header>
@@ -33,6 +34,12 @@
 
       <label for="roughIdea">Cốt truyện sương sương (chỉ cần 2–5 câu):</label>
       <textarea id="roughIdea" rows="5" placeholder="Ví dụ: Trọng Tính học Kinh tế UEH có thằng bạn thân là Đào Trọng dân Kỹ thuật. Tính hay qua phòng trọ uống trà sữa học lỏm code rồi định bỏ thuốc nhốt Đào Trọng ở nhà để một mình đi thi ẵm giải 5 tỷ..."></textarea>
+
+      <label for="visualStyle">Phong cách & Khung hình Render</label>
+      <select id="visualStyle" style="margin-bottom: 10px;">
+        <option value="cao_hoi_hop" selected>🐺 Cáo Hồi Hộp v2.0 (Letterbox 2.05:1 + Chat HUD nổi + Thriller A-minor)</option>
+        <option value="tho_ki_quai">🐰 Thỏ Kì Quái v1.0 (Full 16:9 Drama Học Đường / Công Sở)</option>
+      </select>
 
       <div class="grid-3">
         <div>
@@ -51,8 +58,8 @@
           </select>
         </div>
         <div>
-          <label for="channelName">Tên kênh góc trái</label>
-          <input type="text" id="channelName" value="Hồ Sơ Lật Kèo" />
+          <label for="channelName">Tên kênh (Watermark)</label>
+          <input type="text" id="channelName" value="Cáo Hồi Hộp" />
         </div>
       </div>
 
@@ -183,6 +190,10 @@
               <div>
                 <label for="scLayout">Bố cục góc máy</label>
                 <select id="scLayout">
+                  <option value="ots_phone_groupchat">★ OTS Nhìn Trộm Nhóm Chat (Hook v2.0)</option>
+                  <option value="floating_chat_scene">★ Chat HUD Nổi + Rào Gỗ 3 Lớp (v2.0)</option>
+                  <option value="creature_enclosure">★ Quái Vật / Phản Diện Sau Song Sắt (v2.0)</option>
+                  <option value="fence_two_shot">★ Hai Người Sau Hàng Rào 3 Lớp (v2.0)</option>
                   <option value="ui_transfer_stamp">Đóng dấu chuyển giao UI</option>
                   <option value="ecu_main">Cận mặt Nhân vật chính</option>
                   <option value="ecu_rival">Cận mặt Đối thủ ($ / Sợ)</option>
@@ -208,6 +219,8 @@
               <div>
                 <label for="scBg">Bối cảnh nền</label>
                 <select id="scBg">
+                  <option value="zoo_enclosure">★ Sở thú đêm / Chuồng thú u ám</option>
+                  <option value="haunted_corridor">★ Hành lang tối / Quy tắc sinh tồn</option>
                   <option value="dark_lab">Phòng máy / Văn phòng tối</option>
                   <option value="campus_hall">Sảnh Đại học / Kinh tế</option>
                   <option value="dorm_room">Phòng trọ / Ký túc xá</option>
@@ -219,12 +232,40 @@
               </div>
             </div>
 
-            <label for="scCardTitle">Chữ tiêu đề trên bảng / màn hình đạo cụ (nếu có)</label>
-            <input type="text" id="scCardTitle" placeholder="VD: CẢNH BÁO ĐÁNH CẮP MÃ NGUỒN!" />
+            <div class="grid-2">
+              <div>
+                <label for="scAvatarIcon">Avatar HUD / Sinh vật Dark-Comic</label>
+                <select id="scAvatarIcon">
+                  <option value="elephant">Voi Già Mắt Trắng</option>
+                  <option value="tiger">Hổ Dữ Rình Mồi</option>
+                  <option value="gorilla">Khỉ Đột King Kong</option>
+                  <option value="parrot">Vẹt Sát Thủ</option>
+                  <option value="skull">Đầu Lâu Cảnh Báo</option>
+                  <option value="hacker">Hacker Ẩn Danh</option>
+                  <option value="boss">Trùm Cuối</option>
+                </select>
+              </div>
+              <div>
+                <label for="scForeground">Lớp tiền cảnh 3D Parallax</label>
+                <select id="scForeground">
+                  <option value="none">Tự động theo bố cục</option>
+                  <option value="wood_fence">Hàng rào gỗ tiền cảnh</option>
+                  <option value="iron_cage">Song sắt chuồng thú</option>
+                </select>
+              </div>
+            </div>
+
+            <label for="scCardTitle">Chữ tiêu đề / Tên người gửi Chat HUD / Tên nhóm</label>
+            <input type="text" id="scCardTitle" placeholder="VD: Voi Già Ăn Chay hoặc [NHÓM CẮN CHẾT QUẢN LÝ]" />
 
             <label for="scText">Lời dẫn chuyện / Thoại tiếng Việt của cảnh này</label>
             <textarea id="scText" rows="4"></textarea>
 
+            <input type="file" id="fileSceneBg" accept="image/*" style="display:none;" />
+            <div class="btn-row" style="margin-bottom:8px;">
+              <button class="btn btn-amber" id="btnGenSceneArt" style="flex:1;">🎨 AI Vẽ Nền Dark-Comic (Nano Banana 2.1)</button>
+              <button class="btn" id="btnUploadSceneBg">🖼 Tải Ảnh Nền Lên</button>
+            </div>
             <div class="btn-row">
               <button class="btn" id="btnAddScene">+ Thêm Cảnh Dưới</button>
               <button class="btn" id="btnDeleteScene" style="color:#ff8787;">Xóa Cảnh</button>
